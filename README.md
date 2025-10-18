@@ -10,6 +10,8 @@ plant_classification_app
 ├── database.py                   # SQLAlchemy engine/session setup (uses .env if present)
 ├── models.py                     # SQLAlchemy ORM models
 ├── schemas.py                    # Pydantic schemas
+├── .env.sample                   # Copy to .env and adjust DB URL if needed
+├── .gitignore                    # Git ignores (e.g., uploads, venv, caches)
 ├── ml/
 │   ├── model.py                  # Load model + inference helpers
 │   ├── preprocessing.py          # Image preprocessing utilities
@@ -19,6 +21,7 @@ plant_classification_app
 │   ├── css/style.css             # Stylesheet (name may differ from earlier docs)
 │   ├── js/script.js              # Frontend interactions
 │   └── uploads/                  # Uploaded images (runtime generated)
+│       └── .gitkeep              # Keeps folder in version control
 ├── templates/
 │   └── main.html                 # Main HTML template
 ├── requirements.txt              # Python dependencies
@@ -32,7 +35,13 @@ plant_classification_app
 ## Environment Configuration
 The application reads `SQLALCHEMY_DATABASE_URL` from the environment (loaded via `.env` if present). If not set, it falls back to a local SQLite file `sqlite:///./plants.db`.
 
-Create a `.env` file in the project root:
+You can start from the provided `.env.sample`:
+```
+# Windows PowerShell (copy sample to .env)
+Copy-Item .env.sample .env
+```
+
+Or create a `.env` file manually in the project root:
 ```
 # Example for SQLite (default)
 # SQLALCHEMY_DATABASE_URL=sqlite:///./plants.db
@@ -59,24 +68,26 @@ Create a `.env` file in the project root:
    # source plantenv/bin/activate
    ```
 
-3. Install dependencies
+3. (Optional) Copy `.env.sample` to `.env` and adjust DB settings.
+
+4. Install dependencies
    ```bash
    pip install -r requirements.txt
    ```
 
-4. (Optional) Create and edit `.env` if you want a DB other than default SQLite.
+5. (Optional) Edit `.env` if you want a DB other than default SQLite.
 
-5. Apply database migrations / create tables (SQLAlchemy `create_all` runs automatically on startup via `main.py`).
+6. Apply database migrations / create tables (SQLAlchemy `create_all` runs automatically on startup via `main.py`).
 
-6. Run the application
+7. Run the application
    ```bash
    uvicorn main:app --reload
    ```
 
-7. Open in browser
+8. Open in browser
    http://127.0.0.1:8000
 
-8. Interactive API docs (Swagger UI)
+9. Interactive API docs (Swagger UI)
    http://127.0.0.1:8000/docs
 
 ## Usage
@@ -154,6 +165,44 @@ To update the model:
 ### Adding Class Labels
 Class label mapping lives inside `ml/model.py` (`class_names` dict). Update it if your new model changes index ordering.
 
+### Built-in class labels and threshold
+The current model wrapper includes 30 classes mapped by index:
+
+- 0: aloe vera
+- 1: banana
+- 2: bilimbi
+- 3: cantaloupe
+- 4: cassava
+- 5: coconut
+- 6: corn
+- 7: cucumber
+- 8: curcuma
+- 9: eggplant
+- 10: galangal
+- 11: ginger
+- 12: guava
+- 13: kale
+- 14: longbeans
+- 15: mango
+- 16: melon
+- 17: orange
+- 18: paddy
+- 19: papaya
+- 20: pepper chili
+- 21: pineapple
+- 22: pomelo
+- 23: shallot
+- 24: soybeans
+- 25: spinach
+- 26: sweet potatoes
+- 27: tobacco
+- 28: waterapple
+- 29: watermelon
+
+Notes:
+- Returned `class_name` is title-cased before being sent in the API response.
+- `is_plant` is set to true when confidence >= 0.70. You can tweak this threshold in `ml/model.py` if desired.
+
 ## Environment Variable Summary
 | Name | Required | Default | Purpose |
 |------|----------|---------|---------|
@@ -175,6 +224,18 @@ Configured at INFO level in `main.py`. Look for loggers with prefixes like `[UPL
 | SQLite locking errors | Concurrent writes | Consider switching to PostgreSQL in `.env`. |
 | High memory usage | TensorFlow GPU / large model | Use a lighter model or enable memory growth for GPU. |
 | 422 Unprocessable Entity | Upload field name mismatch | Ensure form field is `file`. |
+| 500 on /plants response | Pydantic v2 config mismatch | See Pydantic v2 compatibility note below. |
+
+### Pydantic v2 compatibility
+This project currently declares `orm_mode = True` in `schemas.py` (a Pydantic v1 setting). If you install Pydantic v2 (common with modern FastAPI), you may need to update either the dependency or the schema config to serialize ORM objects from SQLAlchemy.
+
+Two easy options:
+- Pin Pydantic to v1 in `requirements.txt` (compatible with existing code):
+   - Add a version constraint like `pydantic<2` and reinstall.
+- OR update `schemas.py` for Pydantic v2:
+   - Replace the inner `Config` with: `from pydantic import BaseModel, ConfigDict` and set `model_config = ConfigDict(from_attributes=True)` in `PlantBase`.
+
+FastAPI 0.115+ works well with Pydantic v2 when `from_attributes=True` is set.
 
 ## Security Considerations (To Improve Before Production)
 - Unrestricted file uploads (no extension / MIME validation).
@@ -190,6 +251,10 @@ Configured at INFO level in `main.py`. Look for loggers with prefixes like `[UPL
 - Add async background tasks for heavy preprocessing.
 - Write unit tests (currently absent) for model wrapper and API routes.
 - Dockerize for reproducible deployment.
+
+## Windows tips
+- If PowerShell execution policies block venv activation, run an elevated PowerShell and execute: `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once.
+- Long TensorFlow installs on Windows are normal; consider a virtual environment per project.
 
 ## Key Modules
 - `ml/model.py`: wraps Keras model loading & prediction.
